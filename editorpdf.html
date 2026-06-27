@@ -1,0 +1,1452 @@
+<!-- Versi Minimalis: Boilerplate HTML Dihapus. Semua dependensi PENTING dipindahkan ke bagian atas file. -->
+<!-- Peringatan: Struktur ini non-standar dan mungkin berperilaku berbeda di lingkungan browser lain. -->
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Editor PDF: Tambah Teks, Warna &amp; Gambar lalu Unduh</title>
+<!-- Menggunakan font Inter sesuai standar -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- Font Awesome (JS) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/js/all.min.js"></script>
+<!-- Library PDF-LIB untuk modifikasi PDF -->
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<!-- Library PDF.js untuk rendering preview -->
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.min.js"></script>
+<!-- Google AdSense -->
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+
+<div id="pdf-editor-app-container">
+    <style>
+        /* --- TEMA HIJAU (EMERALD) — selaras dengan Organize PDF --- */
+        #pdf-editor-app-container {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: #374151;
+            line-height: 1.5;
+            margin: 20px auto;
+            max-width: 100%;
+            width: 100%;
+            padding: 0 15px;
+            position: relative;
+            box-sizing: border-box;
+        }
+        #pdf-editor-app-container *, #pdf-editor-app-container *::before, #pdf-editor-app-container *::after { box-sizing: border-box; }
+        #pdf-editor-app-container .pdf-tool-container { width: 100%; text-align: center; }
+
+        /* Header */
+        #pdf-editor-app-container h1 { color: #065f46; margin: 0 0 8px; font-size: clamp(24px, 5vw, 30px); font-weight: 700; }
+        #pdf-editor-app-container .tool-description { font-size: clamp(14px, 3vw, 16px); color: #059669; margin: 0 auto 25px; max-width: 700px; line-height: 1.5; font-weight: 500; }
+
+        /* Animasi */
+        @keyframes editorSpin { to { transform: rotate(360deg); } }
+        @keyframes editorPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+
+        /* Drop Area */
+        #pdf-editor-app-container .pdf-drop-area {
+            border: 3px dashed #6ee7b7;
+            min-height: clamp(280px, 42vh, 380px);
+            padding: clamp(36px, 6vw, 60px) 30px;
+            cursor: pointer;
+            border-radius: 22px;
+            background-color: #ecfdf5;
+            background-image: linear-gradient(180deg, #f0fdf4 0%, #ecfdf5 100%);
+            transition: background-color 0.25s ease, border-color 0.25s ease, transform 0.2s ease, box-shadow 0.25s ease;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+        }
+        #pdf-editor-app-container .pdf-drop-area:hover {
+            background-color: #d1fae5; border-color: #34d399;
+            transform: translateY(-3px); box-shadow: 0 14px 36px rgba(5, 150, 105, 0.14);
+        }
+        #pdf-editor-app-container .pdf-drop-area.is-dragover {
+            background-color: #d1fae5; border-color: #059669; border-style: solid;
+            transform: scale(1.01); box-shadow: 0 0 0 5px #a7f3d0, 0 14px 36px rgba(5, 150, 105, 0.18);
+        }
+        #pdf-editor-app-container .pdf-drop-area .drop-icon {
+            width: 92px; height: 92px; border-radius: 50%;
+            background: #d1fae5; color: #059669;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 40px; margin-bottom: 10px;
+            transition: transform 0.25s ease, background-color 0.25s ease;
+            animation: dropFloat 2.6s ease-in-out infinite;
+        }
+        #pdf-editor-app-container .pdf-drop-area:hover .drop-icon,
+        #pdf-editor-app-container .pdf-drop-area.is-dragover .drop-icon {
+            transform: scale(1.1) translateY(0); background: #a7f3d0; animation-play-state: paused;
+        }
+        #pdf-editor-app-container .pdf-drop-area .drop-title { margin: 0; font-size: clamp(18px, 3.4vw, 23px); color: #065f46; font-weight: 700; }
+        #pdf-editor-app-container .pdf-drop-area .drop-sub { margin: 0; font-size: clamp(13px, 2.6vw, 15px); color: #059669; font-weight: 500; }
+        #pdf-editor-app-container .pdf-drop-area .drop-btn {
+            margin-top: 16px; display: inline-flex; align-items: center; gap: 8px;
+            background: #059669; color: #fff; padding: 11px 26px; border-radius: 10px;
+            font-weight: 600; font-size: 14px; box-shadow: 0 4px 14px rgba(5, 150, 105, 0.28);
+            transition: background-color 0.2s ease, transform 0.1s ease;
+        }
+        #pdf-editor-app-container .pdf-drop-area:hover .drop-btn { background: #047857; }
+        #pdf-editor-app-container .pdf-drop-area .drop-hint { margin: 14px 0 0; font-size: 12px; color: #10b981; font-weight: 500; }
+        @keyframes dropFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+        #pdf-editor-app-container #pdfInput, #pdf-editor-app-container #imgInput { display: none; }
+
+        /* Indikator Loading (spinner) */
+        #pdf-editor-app-container #editorLoading {
+            display: none; align-items: center; justify-content: center; gap: 12px;
+            margin-top: 18px; background: #ffffff; border: 1px solid #d1fae5; border-radius: 10px; padding: 14px;
+        }
+        #pdf-editor-app-container #editorLoading .editor-spinner {
+            display: inline-block; width: 22px; height: 22px;
+            border: 3px solid #d1fae5; border-top-color: #059669;
+            border-radius: 50%; animation: editorSpin 0.8s linear infinite;
+        }
+        #pdf-editor-app-container #editorLoadingText { color: #065f46; font-size: 14px; font-weight: 600; animation: editorPulse 1.5s ease-in-out infinite; }
+
+        /* Info & Status */
+        #pdf-editor-app-container #fileInfo {
+            text-align: left; margin-top: 20px; padding: 15px; background: #d1fae5;
+            border-radius: 10px; word-break: break-all; border: 1px solid #a7f3d0;
+            width: 100%; font-weight: 500; color: #065f46;
+        }
+        #pdf-editor-app-container #status, #pdf-editor-app-container #error { margin-top: 15px; font-size: 14px; min-height: 1.2em; font-weight: 600; }
+        #pdf-editor-app-container #status { color: #047857; }
+        #pdf-editor-app-container #error { color: #dc3545; font-weight: 700; }
+
+        /* ====== TOOLBAR EDITOR ====== */
+        #pdf-editor-app-container .editor-toolbar {
+            display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center;
+            margin-top: 18px; padding: 12px; background: #f0fdf4;
+            border: 1px solid #a7f3d0; border-radius: 12px;
+        }
+        #pdf-editor-app-container .tool-group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+        #pdf-editor-app-container .tool-sep { width: 1px; align-self: stretch; background: #a7f3d0; margin: 2px 4px; }
+
+        #pdf-editor-app-container .tool-btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: #fff; border: 1px solid #6ee7b7; color: #047857;
+            padding: 8px 12px; border-radius: 8px; cursor: pointer;
+            font-family: inherit; font-size: 13px; font-weight: 600;
+            transition: background-color 0.15s, transform 0.1s, box-shadow 0.15s;
+            -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        }
+        #pdf-editor-app-container .tool-btn:hover:not(:disabled) { background: #ecfdf5; }
+        #pdf-editor-app-container .tool-btn:active:not(:disabled) { transform: scale(0.94); }
+        #pdf-editor-app-container .tool-btn.active { background: #059669; color: #fff; border-color: #059669; box-shadow: 0 0 0 3px #a7f3d0; }
+        /* Saat tombol aktif di-hover, tetap hijau (jangan jadi terang sehingga ikon putih hilang) */
+        #pdf-editor-app-container .tool-btn.active:hover:not(:disabled) { background: #047857; color: #fff; }
+        #pdf-editor-app-container .tool-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        /* Tombol ikon ringkas (tanpa teks) */
+        #pdf-editor-app-container .tool-btn.icon { width: 38px; height: 38px; padding: 0; justify-content: center; font-size: 15px; }
+
+        #pdf-editor-app-container .prop-control { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #065f46; }
+        #pdf-editor-app-container .prop-control.is-hidden { display: none; }
+        #pdf-editor-app-container input[type="color"] {
+            width: 34px; height: 30px; padding: 0; border: 1px solid #6ee7b7; border-radius: 6px; cursor: pointer; background: #fff;
+        }
+        #pdf-editor-app-container input[type="number"] {
+            width: 58px; padding: 6px 8px; border: 1px solid #6ee7b7; border-radius: 6px; font-family: inherit; font-size: 13px; color: #065f46;
+        }
+        #pdf-editor-app-container input[type="range"] { accent-color: #059669; width: 90px; }
+        #pdf-editor-app-container .swatch {
+            width: 22px; height: 22px; border-radius: 5px; border: 2px solid #fff;
+            box-shadow: 0 0 0 1px #a7f3d0; cursor: pointer; padding: 0; vertical-align: middle;
+            transition: transform 0.1s;
+        }
+        #pdf-editor-app-container .swatch:hover { transform: scale(1.15); }
+        #pdf-editor-app-container .swatch:active { transform: scale(0.9); }
+        /* Dropdown bentuk pada tombol Warna/Sorotan */
+        #pdf-editor-app-container .tool-dd { position: relative; display: inline-flex; }
+        #pdf-editor-app-container .tool-btn.has-caret { gap: 3px; width: auto; padding: 0 8px; }
+        #pdf-editor-app-container .dd-caret { font-size: 10px; opacity: 0.8; }
+        #pdf-editor-app-container .dd-menu {
+            position: absolute; top: calc(100% + 6px); left: 0; z-index: 50;
+            background: #fff; border: 1px solid #a7f3d0; border-radius: 10px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.14); padding: 6px; min-width: 190px;
+            display: none; flex-direction: column; gap: 2px;
+        }
+        #pdf-editor-app-container .dd-menu.open { display: flex; }
+        #pdf-editor-app-container .dd-item {
+            display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+            background: #fff; border: none; border-radius: 7px; cursor: pointer;
+            padding: 9px 11px; font-family: inherit; font-size: 13px; font-weight: 600; color: #065f46;
+            transition: background-color 0.12s;
+        }
+        #pdf-editor-app-container .dd-item i { width: 16px; text-align: center; color: #059669; }
+        #pdf-editor-app-container .dd-item:hover { background: #ecfdf5; }
+        #pdf-editor-app-container .dd-item.active { background: #d1fae5; }
+        #pdf-editor-app-container .dd-item.active::after { content: '\2713'; margin-left: auto; color: #059669; font-weight: 700; }
+
+        /* ====== AREA HALAMAN (STAGE) ====== */
+        #pdf-editor-app-container .page-nav {
+            display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 16px; flex-wrap: wrap;
+        }
+        #pdf-editor-app-container .page-nav .nav-btn {
+            background: #fff; border: 1px solid #6ee7b7; color: #047857; width: 38px; height: 38px;
+            border-radius: 8px; cursor: pointer; font-size: 15px; transition: background-color 0.15s, transform 0.1s;
+        }
+        #pdf-editor-app-container .page-nav .nav-btn:hover:not(:disabled) { background: #ecfdf5; }
+        #pdf-editor-app-container .page-nav .nav-btn:active:not(:disabled) { transform: scale(0.9); }
+        #pdf-editor-app-container .page-nav .nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        #pdf-editor-app-container .page-nav .nav-btn.wide { width: auto; min-width: 56px; padding: 0 10px; font-size: 13px; font-weight: 700; }
+        #pdf-editor-app-container .page-nav .nav-sep { width: 1px; height: 24px; background: #a7f3d0; margin: 0 4px; }
+        #pdf-editor-app-container .page-indicator { font-size: 14px; font-weight: 700; color: #065f46; min-width: 120px; }
+
+        #pdf-editor-app-container .editor-stage {
+            margin-top: 16px; padding: 20px; background: #f0fdf4;
+            border: 1px solid #a7f3d0; border-radius: 12px;
+            overflow: auto; display: flex; justify-content: center;
+        }
+        #pdf-editor-app-container .page-wrap {
+            position: relative; background: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+            flex-shrink: 0; line-height: 0;
+        }
+        #pdf-editor-app-container .page-wrap canvas { display: block; }
+        #pdf-editor-app-container .anno-layer { position: absolute; inset: 0; line-height: normal; }
+        /* Saat tool selain "pilih" aktif, layer menangkap klik untuk menempatkan elemen */
+        #pdf-editor-app-container .anno-layer.placing { cursor: crosshair; }
+
+        /* Elemen anotasi */
+        #pdf-editor-app-container .anno {
+            position: absolute; box-sizing: border-box; touch-action: none; cursor: move;
+        }
+        #pdf-editor-app-container .anno.selected { outline: 2px solid #059669; outline-offset: 1px; }
+        #pdf-editor-app-container .anno-text {
+            min-width: 12px; min-height: 12px; white-space: pre; overflow: visible;
+            font-family: 'Helvetica', 'Arial', sans-serif; padding: 0; outline: none; cursor: move;
+        }
+        #pdf-editor-app-container .anno-text[contenteditable="true"] { cursor: text; outline: 2px dashed #059669; background: rgba(236,253,245,0.6); }
+        #pdf-editor-app-container .anno-rect { border-radius: 2px; }
+        #pdf-editor-app-container .anno-image img { width: 100%; height: 100%; display: block; pointer-events: none; }
+        #pdf-editor-app-container .anno-line, #pdf-editor-app-container .anno-draw { background: transparent; }
+        #pdf-editor-app-container .anno-line svg, #pdf-editor-app-container .anno-draw svg { width: 100%; height: 100%; display: block; overflow: visible; pointer-events: none; }
+        /* Garis sementara saat menggambar */
+        #pdf-editor-app-container #drawPreview { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+
+        /* Tombol hapus & handle resize pada elemen terpilih */
+        #pdf-editor-app-container .anno-del {
+            position: absolute; top: -12px; right: -12px; width: 24px; height: 24px; border-radius: 50%;
+            background: #dc3545; color: #fff; border: 2px solid #fff; cursor: pointer; display: none;
+            align-items: center; justify-content: center; font-size: 11px; z-index: 5; padding: 0;
+        }
+        #pdf-editor-app-container .anno.selected .anno-del { display: flex; }
+        #pdf-editor-app-container .anno-resize {
+            position: absolute; bottom: -8px; right: -8px; width: 16px; height: 16px; border-radius: 50%;
+            background: #059669; border: 2px solid #fff; cursor: nwse-resize; display: none; z-index: 5; touch-action: none;
+        }
+        #pdf-editor-app-container .anno.selected.resizable .anno-resize { display: block; }
+
+        /* Tombol Aksi Utama */
+        #pdf-editor-app-container .action-buttons { margin-top: 25px; display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+        #pdf-editor-app-container .action-buttons.action-top { margin-top: 16px; margin-bottom: 4px; }
+        #pdf-editor-app-container .btn {
+            padding: 11px 22px; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 15px;
+            font-weight: 600; border: none; transition: background-color 0.2s, transform 0.12s;
+            -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        }
+        #pdf-editor-app-container .btn:active:not(:disabled) { transform: scale(0.93); }
+        #pdf-editor-app-container .btn-primary { background-color: #059669; color: #fff; }
+        #pdf-editor-app-container .btn-primary:hover:not(:disabled) { background-color: #047857; }
+        #pdf-editor-app-container .btn-secondary { background-color: #10b981; color: #fff; }
+        #pdf-editor-app-container .btn-secondary:hover:not(:disabled) { background-color: #059669; }
+        #pdf-editor-app-container .btn-danger { background-color: #dc3545; color: #fff; }
+        #pdf-editor-app-container .btn-danger:hover:not(:disabled) { background-color: #c82333; }
+        #pdf-editor-app-container .btn:disabled { background-color: #9ca3af; cursor: not-allowed; }
+        #pdf-editor-app-container .hidden { display: none !important; }
+
+        /* Responsif */
+        @media (max-width: 600px) {
+            #pdf-editor-app-container { padding: 0 10px; }
+            #pdf-editor-app-container .pdf-drop-area { padding: 50px 20px; border-radius: 12px; }
+            #pdf-editor-app-container .editor-stage { padding: 10px; }
+            #pdf-editor-app-container .action-buttons { flex-direction: column; align-items: stretch; gap: 10px; }
+        }
+    </style>
+
+    <!-- Toast Notification -->
+    <div id="editorToast" style="background-color: #065f46; border-radius: 8px; bottom: 30px; box-shadow: rgba(0, 0, 0, 0.2) 0px 4px 12px; color: white; font-size: 14px; left: 50%; min-width: 200px; opacity: 0; padding: 12px; position: fixed; text-align: center; transform: translateX(-50%); transition: opacity 0.3s, visibility 0.3s; visibility: hidden; z-index: 9999;">
+        Berhasil!
+    </div>
+
+    <div class="pdf-tool-container">
+        <h1><i class="fas fa-pen-to-square"></i> Editor PDF</h1>
+        <p class="tool-description">Unggah file PDF lalu tambahkan <b>teks</b>, <b>blok warna / sorotan</b>, <b>garis &amp; coretan</b>, dan <b>sisipkan gambar</b> langsung di atas halaman. Geser, ubah ukuran, urungkan, lalu simpan &amp; unduh sebagai PDF baru. Semua proses dilakukan secara lokal di browser Anda.</p>
+
+        <div class="pdf-drop-area" id="pdfDropArea">
+            <div class="drop-icon"><i class="fas fa-file-arrow-up"></i></div>
+            <p class="drop-title">Seret &amp; jatuhkan file PDF ke sini</p>
+            <p class="drop-sub">atau klik untuk memilih dari perangkat Anda</p>
+            <span class="drop-btn"><i class="fas fa-folder-open"></i> Pilih File PDF</span>
+            <p class="drop-hint"><i class="fas fa-lock"></i> Diproses lokal di browser — file tidak diunggah ke server</p>
+        </div>
+        <input type="file" id="pdfInput" accept="application/pdf">
+        <input type="file" id="imgInput" accept="image/*">
+
+        <!-- Indikator Loading -->
+        <div id="editorLoading">
+            <span class="editor-spinner"></span>
+            <span id="editorLoadingText">Memproses...</span>
+        </div>
+
+        <div id="fileInfo" class="hidden"></div>
+
+        <!-- ====== EDITOR ====== -->
+        <div id="editor" class="hidden">
+            <div class="action-buttons action-top">
+                <button class="btn btn-secondary hidden" id="downloadBtn">
+                    <i class="fas fa-download"></i> Simpan &amp; Unduh PDF
+                </button>
+                <button class="btn btn-danger hidden" id="resetBtn">
+                    <i class="fas fa-times-circle"></i> Batalkan &amp; Reset
+                </button>
+            </div>
+            <div class="editor-toolbar">
+                <div class="tool-group">
+                    <button class="tool-btn icon active" id="toolSelect" data-tool="select" title="Pilih / Geser"><i class="fas fa-arrow-pointer"></i></button>
+                    <button class="tool-btn icon" id="toolText" data-tool="text" title="Tambah Teks"><i class="fas fa-font"></i></button>
+                    <span class="tool-dd" id="rectDD">
+                        <button class="tool-btn icon has-caret" id="toolRect" data-tool="rect" title="Blok Warna / Sorotan"><i class="fas fa-square" id="rectToolIcon"></i><i class="fas fa-caret-down dd-caret"></i></button>
+                        <div class="dd-menu" id="rectMenu">
+                            <button class="dd-item active" data-shape="rect" data-style="fill"><i class="fas fa-square"></i> Blok isi (sorotan)</button>
+                            <button class="dd-item" data-shape="rect" data-style="outline"><i class="far fa-square"></i> Kotak garis</button>
+                            <button class="dd-item" data-shape="ellipse" data-style="fill"><i class="fas fa-circle"></i> Elips isi</button>
+                            <button class="dd-item" data-shape="ellipse" data-style="outline"><i class="far fa-circle"></i> Lingkaran garis</button>
+                        </div>
+                    </span>
+                    <button class="tool-btn icon" id="toolLine" data-tool="line" title="Garis Lurus"><i class="fas fa-slash"></i></button>
+                    <button class="tool-btn icon" id="toolDraw" data-tool="draw" title="Coret Bebas"><i class="fas fa-pen-nib"></i></button>
+                    <button class="tool-btn icon" id="toolImage" data-tool="image" title="Sisipkan Gambar"><i class="fas fa-image"></i></button>
+                </div>
+                <div class="tool-sep"></div>
+                <div class="tool-group">
+                    <label class="prop-control" id="propColor" title="Warna"><input type="color" id="colorPicker" value="#dc2626"></label>
+                    <label class="prop-control is-hidden" id="propFont" title="Ukuran font"><i class="fas fa-text-height"></i><input type="number" id="fontSize" min="6" max="200" value="24"></label>
+                    <label class="prop-control is-hidden" id="propThick" title="Ketebalan garis"><i class="fas fa-pen"></i><input type="number" id="thickness" min="1" max="40" value="3"></label>
+                    <label class="prop-control is-hidden" id="propOpacity" title="Opasitas"><i class="fas fa-droplet"></i><input type="range" id="opacity" min="10" max="100" value="40"><span id="opacityVal">40%</span></label>
+                    <span class="prop-control is-hidden" id="propSwatch">
+                        <button class="swatch" data-color="#fde047" title="Stabilo Kuning" style="background:#fde047"></button>
+                        <button class="swatch" data-color="#86efac" title="Stabilo Hijau" style="background:#86efac"></button>
+                        <button class="swatch" data-color="#f9a8d4" title="Stabilo Pink" style="background:#f9a8d4"></button>
+                        <button class="swatch" data-color="#93c5fd" title="Stabilo Biru" style="background:#93c5fd"></button>
+                    </span>
+                </div>
+                <div class="tool-sep"></div>
+                <div class="tool-group">
+                    <button class="tool-btn icon" id="undoBtn" title="Urungkan (Ctrl+Z)" disabled><i class="fas fa-rotate-left"></i></button>
+                    <button class="tool-btn icon" id="redoBtn" title="Ulangi (Ctrl+Y)" disabled><i class="fas fa-rotate-right"></i></button>
+                    <button class="tool-btn icon" id="clearPageBtn" title="Hapus editan halaman ini"><i class="fas fa-eraser"></i></button>
+                    <button class="tool-btn icon" id="clearAllBtn" title="Hapus semua editan" style="color:#dc3545;border-color:#fca5a5;"><i class="fas fa-trash-alt"></i></button>
+                </div>
+            </div>
+
+            <div class="page-nav">
+                <button class="nav-btn" id="prevPage" title="Halaman sebelumnya"><i class="fas fa-chevron-left"></i></button>
+                <span class="page-indicator" id="pageIndicator">Halaman 1 / 1</span>
+                <button class="nav-btn" id="nextPage" title="Halaman berikutnya"><i class="fas fa-chevron-right"></i></button>
+                <span class="nav-sep"></span>
+                <button class="nav-btn" id="zoomOut" title="Perkecil"><i class="fas fa-magnifying-glass-minus"></i></button>
+                <button class="nav-btn wide" id="zoomReset" title="Sesuaikan"><span id="zoomLabel">100%</span></button>
+                <button class="nav-btn" id="zoomIn" title="Perbesar"><i class="fas fa-magnifying-glass-plus"></i></button>
+            </div>
+
+            <div class="editor-stage" id="editorStage">
+                <div class="page-wrap" id="pageWrap">
+                    <canvas id="pageCanvas"></canvas>
+                    <div class="anno-layer" id="annoLayer"></div>
+                </div>
+            </div>
+        </div>
+
+        <p id="status"></p>
+        <p id="error"></p>
+
+        <!-- INSTRUCTIONS SECTION -->
+        <div style="background: #ffffff; border-radius: 12px; border: 1px solid #e5e7eb; margin-top: 30px; padding: 20px; text-align: left; width: 100%;">
+            <h4 style="color: #065f46; font-size: 15px; font-weight: 700; margin-top: 0; margin-bottom: 12px; border-bottom: 2px solid #ecfdf5; padding-bottom: 8px;">Cara Penggunaan:</h4>
+            <ul style="color: #4b5563; font-size: 13px; margin: 0; padding-left: 20px; line-height: 1.6;">
+                <li>Klik atau seret <b>satu file PDF</b> ke kotak di atas.</li>
+                <li>Pilih alat <b>Teks</b> lalu <b>klik di halaman</b> untuk menaruh teks — ketik langsung. Klik dua kali teks untuk menyuntingnya lagi.</li>
+                <li>Pilih alat <b>Warna</b> (berupa bentuk yang bisa diisi/digaris) lalu klik halaman untuk menaruhnya. Pilih <b>bentuk</b>: <b>Blok isi</b> (sorotan), <b>Kotak garis</b>, <b>Elips isi</b>, atau <b>Lingkaran garis</b> — pas untuk menyorot, mengotaki, atau melingkari. Atur <b>warna</b>, <b>opasitas</b> (untuk isi) atau <b>ketebalan</b> (untuk garis), serta preset <b>Stabilo</b>.</li>
+                <li>Pilih alat <b>Garis</b> untuk menarik garis lurus, atau <b>Coret</b> untuk menggambar bebas. Atur <b>warna</b> &amp; <b>ketebalan</b> di toolbar.</li>
+                <li>Pilih alat <b>Gambar</b> untuk menyisipkan logo/foto (PNG, JPG, dll.).</li>
+                <li>Dengan alat <b>Pilih</b>: <b>geser</b> elemen untuk memindahkan, tarik titik hijau di pojok untuk <b>mengubah ukuran</b> (kotak/gambar), dan klik tanda <b>×</b> merah (atau tombol Delete) untuk menghapus.</li>
+                <li>Salah edit? Pakai <b>Urungkan / Ulangi</b> (atau <b>Ctrl+Z</b> / <b>Ctrl+Y</b>). Untuk bersih-bersih: <b>Hapus Editan Halaman</b> atau <b>Hapus Semua Editan</b>.</li>
+                <li>Gunakan tombol <b>‹ ›</b> untuk berpindah halaman. Setiap halaman menyimpan editannya sendiri.</li>
+                <li>Klik <b>Simpan &amp; Unduh PDF</b> untuk menyatukan semua editan ke dalam satu file PDF baru (tersimpan sebagai <b>editor.pdf</b>).</li>
+            </ul>
+        </div>
+
+        <!-- ADSENSE -->
+        <div style="margin-top: 20px; text-align: center; width: 100%;">
+            <ins class="adsbygoogle" style="display:block; text-align:center;" data-ad-layout="in-article" data-ad-format="fluid" data-ad-client="ca-pub-8899747271545681" data-ad-slot="4762972827"></ins>
+            <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+        </div>
+
+        <!-- FOOTER -->
+        <div style="margin-top: 25px; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 15px; width: 100%;">
+            <p style="color: #6b7280; font-size: 11px; margin: 0;">* Semua proses berjalan di perangkat Anda (di dalam browser). File PDF tidak diunggah ke server mana pun, jadi tetap privat &amp; aman.</p>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        if (window.pdfjsLib) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.worker.min.js`;
+        }
+        const { PDFDocument, StandardFonts, rgb } = PDFLib;
+
+        const container = document.getElementById('pdf-editor-app-container');
+        const fileInput = container.querySelector('#pdfInput');
+        const imgInput = container.querySelector('#imgInput');
+        const pdfDropArea = container.querySelector('#pdfDropArea');
+        const fileInfo = container.querySelector('#fileInfo');
+        const editor = container.querySelector('#editor');
+        const downloadBtn = container.querySelector('#downloadBtn');
+        const resetBtn = container.querySelector('#resetBtn');
+        const statusEl = container.querySelector('#status');
+        const errorEl = container.querySelector('#error');
+        const loadingBox = container.querySelector('#editorLoading');
+        const loadingText = container.querySelector('#editorLoadingText');
+        const toastEl = container.querySelector('#editorToast');
+
+        const stage = container.querySelector('#editorStage');
+        const pageWrap = container.querySelector('#pageWrap');
+        const pageCanvas = container.querySelector('#pageCanvas');
+        const annoLayer = container.querySelector('#annoLayer');
+        const pageIndicator = container.querySelector('#pageIndicator');
+        const prevPageBtn = container.querySelector('#prevPage');
+        const nextPageBtn = container.querySelector('#nextPage');
+
+        // Toolbar
+        const toolButtons = Array.from(container.querySelectorAll('.tool-btn[data-tool]'));
+        const colorPicker = container.querySelector('#colorPicker');
+        const fontSizeInput = container.querySelector('#fontSize');
+        const thicknessInput = container.querySelector('#thickness');
+        const opacityInput = container.querySelector('#opacity');
+        const opacityVal = container.querySelector('#opacityVal');
+        const propColor = container.querySelector('#propColor');
+        const propFont = container.querySelector('#propFont');
+        const propThick = container.querySelector('#propThick');
+        const propOpacity = container.querySelector('#propOpacity');
+        const propSwatch = container.querySelector('#propSwatch');
+        const toolRectBtn = container.querySelector('#toolRect');
+        const rectMenu = container.querySelector('#rectMenu');
+        const ddItems = Array.from(container.querySelectorAll('#rectMenu .dd-item'));
+        const rectToolIcon = container.querySelector('#rectToolIcon');
+        const zoomInBtn = container.querySelector('#zoomIn');
+        const zoomOutBtn = container.querySelector('#zoomOut');
+        const zoomResetBtn = container.querySelector('#zoomReset');
+        const zoomLabel = container.querySelector('#zoomLabel');
+        const undoBtn = container.querySelector('#undoBtn');
+        const redoBtn = container.querySelector('#redoBtn');
+        const clearPageBtn = container.querySelector('#clearPageBtn');
+        const clearAllBtn = container.querySelector('#clearAllBtn');
+        const swatches = Array.from(container.querySelectorAll('.swatch'));
+
+        // --- State ---
+        let originalBytes = null;       // ArrayBuffer asli (untuk pdf-lib)
+        let pdfDocProxy = null;         // dokumen PDF.js
+        let numPages = 0;
+        let currentPage = 0;            // index 0-based
+        let pageSizes = [];             // { wPt, hPt } per halaman (rotasi 0)
+        let annotations = [];           // semua anotasi (lihat struktur di bawah)
+        let annoSeq = 0;
+
+        let currentTool = 'select';
+        let fitScale = 1;               // skala agar muat lebar stage
+        let zoom = 1;                   // faktor zoom pengguna
+        let scale = 1;                  // skala efektif = fitScale * zoom (px per titik PDF)
+        let selectedId = null;
+        let renderToken = 0;            // membatalkan render lama
+        let thickness = 3;             // ketebalan garis/coret (titik PDF)
+        let rectShape = 'rect';        // bentuk blok warna: 'rect' | 'ellipse'
+        let rectStyle = 'fill';        // gaya blok warna: 'fill' | 'outline'
+
+        // History untuk undo/redo (snapshot anotasi)
+        let history = [];
+        let histIndex = -1;
+        const HIST_LIMIT = 40;
+
+        // State menggambar garis/coret
+        let drawing = null;            // { type, points:[{x,y}], previewSvg }
+
+        /* Struktur anotasi (posisi & ukuran dalam TITIK PDF, origin kiri-atas halaman):
+           text : { id, page, type:'text', x, y, text, color:'#rrggbb', fontSize }
+           rect : { id, page, type:'rect', x, y, w, h, color:'#rrggbb', opacity:0..1, shape:'rect'|'ellipse', style:'fill'|'outline', border:pt }
+           image: { id, page, type:'image', x, y, w, h, dataUrl, natW, natH }   (dataUrl = PNG)
+           line : { id, page, type:'line', points:[{x,y},{x,y}], color, thickness }
+           draw : { id, page, type:'draw', points:[{x,y},...], color, thickness }   (freehand) */
+
+        // ============ EVENT: UPLOAD ============
+        pdfDropArea.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => { if (e.target.files[0]) loadPdf(e.target.files[0]); fileInput.value = ''; });
+
+        // Deteksi seretan yang membawa FILE (bukan drag elemen internal seperti anotasi).
+        function isFileDrag(e) {
+            return e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+        }
+
+        // Drag & drop di SELURUH area widget. Mencegah browser membuka file saat
+        // file dijatuhkan sedikit meleset dari kotak (penyebab umum "gagal seret").
+        let dropDepth = 0;
+        container.addEventListener('dragenter', (e) => {
+            if (!isFileDrag(e)) return;
+            e.preventDefault();
+            dropDepth++;
+            if (!pdfDropArea.classList.contains('hidden')) pdfDropArea.classList.add('is-dragover');
+        });
+        container.addEventListener('dragover', (e) => {
+            if (!isFileDrag(e)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+        });
+        container.addEventListener('dragleave', (e) => {
+            if (!isFileDrag(e)) return;
+            dropDepth = Math.max(0, dropDepth - 1);
+            if (dropDepth === 0) pdfDropArea.classList.remove('is-dragover');
+        });
+        container.addEventListener('drop', (e) => {
+            if (!isFileDrag(e)) return;
+            e.preventDefault();
+            e.stopPropagation();
+            dropDepth = 0;
+            pdfDropArea.classList.remove('is-dragover');
+            const f = e.dataTransfer.files[0];
+            if (!f) return;
+            // Jika sudah ada PDF terbuka, konfirmasi dulu agar editan tidak hilang.
+            if (pdfDocProxy) {
+                if (!confirm('Ganti dengan PDF baru? Semua editan pada PDF saat ini akan hilang.')) return;
+            }
+            loadPdf(f);
+        });
+
+        resetBtn.addEventListener('click', () => resetTool());
+        downloadBtn.addEventListener('click', savePdf);
+
+        // ============ EVENT: TOOLBAR ============
+        toolButtons.forEach(btn => btn.addEventListener('click', (e) => {
+            if (btn.id === 'toolRect') { e.stopPropagation(); toggleRectMenu(); return; }
+            setTool(btn.dataset.tool);
+        }));
+
+        colorPicker.addEventListener('input', () => {
+            const sel = getSelected();
+            if (sel && (sel.type === 'text' || sel.type === 'rect')) { sel.color = colorPicker.value; renderAnnotations(); selectAnno(sel.id); }
+        });
+        fontSizeInput.addEventListener('input', () => {
+            const sel = getSelected();
+            if (sel && sel.type === 'text') { sel.fontSize = clamp(parseInt(fontSizeInput.value) || 24, 6, 200); renderAnnotations(); selectAnno(sel.id); }
+        });
+        opacityInput.addEventListener('input', () => {
+            opacityVal.textContent = opacityInput.value + '%';
+            const sel = getSelected();
+            if (sel && sel.type === 'rect') { sel.opacity = (parseInt(opacityInput.value) || 40) / 100; renderAnnotations(); selectAnno(sel.id); }
+        });
+
+        thicknessInput.addEventListener('input', () => {
+            thickness = clamp(parseInt(thicknessInput.value) || 3, 1, 40);
+            const sel = getSelected();
+            if (sel && (sel.type === 'line' || sel.type === 'draw')) { sel.thickness = thickness; renderAnnotations(); selectAnno(sel.id); }
+            else if (sel && sel.type === 'rect' && sel.style === 'outline') { sel.border = thickness; renderAnnotations(); selectAnno(sel.id); }
+        });
+        thicknessInput.addEventListener('change', () => { if (getSelected()) commitHistory(); });
+
+        // Properti final (change) -> catat ke history
+        colorPicker.addEventListener('change', () => { if (getSelected()) commitHistory(); });
+        fontSizeInput.addEventListener('change', () => { if (getSelected()) commitHistory(); });
+        opacityInput.addEventListener('change', () => { if (getSelected()) commitHistory(); });
+
+        // Preset stabilo: aktifkan tool Warna + set warna & opasitas sorotan
+        swatches.forEach(sw => sw.addEventListener('click', () => {
+            const col = sw.dataset.color;
+            colorPicker.value = col;
+            opacityInput.value = 40; opacityVal.textContent = '40%';
+            const sel = getSelected();
+            if (sel && sel.type === 'rect') { sel.color = col; sel.opacity = 0.4; renderAnnotations(); selectAnno(sel.id); commitHistory(); }
+            else { setTool('rect'); }
+            showFeedback('Warna stabilo dipilih. Klik halaman untuk menyorot.');
+        }));
+
+        // Dropdown bentuk pada tombol Warna/Sorotan
+        function toggleRectMenu() { rectMenu.classList.contains('open') ? closeRectMenu() : openRectMenu(); }
+        function openRectMenu() { syncShapeUI(); rectMenu.classList.add('open'); }
+        function closeRectMenu() { rectMenu.classList.remove('open'); }
+
+        // Selaraskan ikon tombol & item aktif dengan bentuk terpilih saat ini.
+        function syncShapeUI() {
+            const sel = getSelected();
+            const shape = (sel && sel.type === 'rect') ? (sel.shape || 'rect') : rectShape;
+            const style = (sel && sel.type === 'rect') ? (sel.style || 'fill') : rectStyle;
+            ddItems.forEach(it => it.classList.toggle('active', it.dataset.shape === shape && it.dataset.style === style));
+            const map = { 'rect|fill': 'fas fa-square', 'rect|outline': 'far fa-square', 'ellipse|fill': 'fas fa-circle', 'ellipse|outline': 'far fa-circle' };
+            rectToolIcon.className = (map[shape + '|' + style] || 'fas fa-square');
+            rectToolIcon.id = 'rectToolIcon';
+        }
+
+        ddItems.forEach(it => it.addEventListener('click', (e) => {
+            e.stopPropagation();
+            rectShape = it.dataset.shape; rectStyle = it.dataset.style;
+            const sel = getSelected();
+            if (sel && sel.type === 'rect') {
+                sel.shape = rectShape; sel.style = rectStyle;
+                renderAnnotations(); selectAnno(sel.id); commitHistory();
+            } else {
+                setTool('rect');
+            }
+            syncShapeUI();
+            closeRectMenu();
+        }));
+
+        // Tutup menu saat klik di luar
+        document.addEventListener('click', (e) => {
+            if (!rectMenu.classList.contains('open')) return;
+            if (e.target.closest('#rectDD')) return;
+            closeRectMenu();
+        });
+
+        undoBtn.addEventListener('click', undo);
+        redoBtn.addEventListener('click', redo);
+        clearPageBtn.addEventListener('click', clearPageEdits);
+        clearAllBtn.addEventListener('click', clearAllEdits);
+
+        zoomInBtn.addEventListener('click', () => setZoom(zoom + 0.2));
+        zoomOutBtn.addEventListener('click', () => setZoom(zoom - 0.2));
+        zoomResetBtn.addEventListener('click', () => setZoom(1));
+
+        // ============ EVENT: NAVIGASI HALAMAN ============
+        prevPageBtn.addEventListener('click', () => goToPage(currentPage - 1));
+        nextPageBtn.addEventListener('click', () => goToPage(currentPage + 1));
+
+        // ============ EVENT: KLIK LAYER UNTUK MENEMPATKAN ELEMEN ============
+        annoLayer.addEventListener('pointerdown', onLayerPointerDown);
+
+        // Image input untuk tool gambar
+        imgInput.addEventListener('change', (e) => {
+            const f = e.target.files[0];
+            imgInput.value = '';
+            if (f) placeImage(f);
+        });
+
+        // Klik di luar elemen => batalkan seleksi (saat tool pilih)
+        document.addEventListener('pointerdown', (e) => {
+            if (!editor.contains(e.target)) return;
+            if (e.target.closest('.anno')) return;
+            if (e.target.closest('.editor-toolbar')) return;
+            deselect();
+        });
+
+        // Pintasan keyboard (hanya saat editor aktif & tidak sedang mengetik teks)
+        document.addEventListener('keydown', (e) => {
+            if (editor.classList.contains('hidden')) return;
+            const editing = annoLayer.querySelector('[contenteditable="true"]');
+            if (editing) return;
+            const ctrl = e.ctrlKey || e.metaKey;
+            if (ctrl && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
+            if (ctrl && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) { e.preventDefault(); redo(); return; }
+            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
+                e.preventDefault();
+                deleteAnno(selectedId);
+            }
+        });
+
+        // Re-fit saat ukuran jendela berubah
+        let resizeTimer = null;
+        window.addEventListener('resize', () => {
+            if (!pdfDocProxy) return;
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => renderPage(currentPage), 150);
+        });
+
+        // ============ CORE: LOAD PDF ============
+        async function loadPdf(file) {
+            if (!file || file.type !== 'application/pdf') {
+                showError('Mohon unggah file PDF yang valid.');
+                showToast('Mohon unggah file PDF yang valid!');
+                return;
+            }
+            showError('');
+            showLoading('Memuat PDF...');
+            try {
+                originalBytes = await file.arrayBuffer();
+                pdfDocProxy = await pdfjsLib.getDocument({ data: originalBytes.slice(0) }).promise;
+                numPages = pdfDocProxy.numPages;
+
+                // Cache ukuran tiap halaman (rotasi 0)
+                pageSizes = [];
+                for (let i = 1; i <= numPages; i++) {
+                    const page = await pdfDocProxy.getPage(i);
+                    const vp = page.getViewport({ scale: 1, rotation: 0 });
+                    pageSizes.push({ wPt: vp.width, hPt: vp.height });
+                }
+
+                annotations = [];
+                annoSeq = 0;
+                currentPage = 0;
+                zoom = 1;
+                selectedId = null;
+                initHistory();
+
+                fileInfo.classList.remove('hidden');
+                fileInfo.innerHTML = `<strong>File:</strong> ${escapeHtml(file.name)}<br><strong>Total Halaman:</strong> ${numPages}`;
+
+                pdfDropArea.classList.add('hidden');
+                editor.classList.remove('hidden');
+                downloadBtn.classList.remove('hidden');
+                resetBtn.classList.remove('hidden');
+
+                setTool('select');
+                await renderPage(0);
+                hideLoading();
+                showToast('PDF berhasil dimuat! Mulai mengedit.');
+            } catch (err) {
+                console.error('PDF Loading Error:', err);
+                showError('Gagal memuat PDF. File mungkin rusak atau terproteksi.');
+                showToast('Gagal memuat PDF.');
+                hideLoading();
+                resetTool();
+            }
+        }
+
+        // ============ CORE: RENDER HALAMAN ============
+        async function goToPage(idx) {
+            if (idx < 0 || idx >= numPages) return;
+            deselect();
+            await renderPage(idx);
+        }
+
+        function computeFitScale(wPt) {
+            // Lebar tersedia di dalam stage (kurangi padding)
+            const avail = Math.max(220, stage.clientWidth - 40);
+            return Math.min(avail / wPt, 2); // jangan terlalu besar untuk halaman kecil
+        }
+
+        async function renderPage(idx) {
+            currentPage = idx;
+            const token = ++renderToken;
+            const page = await pdfDocProxy.getPage(idx + 1);
+
+            fitScale = computeFitScale(pageSizes[idx].wPt);
+            scale = fitScale * zoom;
+
+            const viewport = page.getViewport({ scale, rotation: 0 });
+            // Render tajam di layar HiDPI
+            const dpr = window.devicePixelRatio || 1;
+            pageCanvas.width = Math.round(viewport.width * dpr);
+            pageCanvas.height = Math.round(viewport.height * dpr);
+            pageCanvas.style.width = viewport.width + 'px';
+            pageCanvas.style.height = viewport.height + 'px';
+            pageWrap.style.width = viewport.width + 'px';
+            pageWrap.style.height = viewport.height + 'px';
+
+            const ctx = pageCanvas.getContext('2d');
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, viewport.width, viewport.height);
+            await page.render({ canvasContext: ctx, viewport }).promise;
+            if (token !== renderToken) return; // dibatalkan oleh render lebih baru
+
+            pageIndicator.textContent = `Halaman ${idx + 1} / ${numPages}`;
+            prevPageBtn.disabled = (idx === 0);
+            nextPageBtn.disabled = (idx === numPages - 1);
+            zoomLabel.textContent = Math.round(zoom * 100) + '%';
+
+            renderAnnotations();
+        }
+
+        function setZoom(z) {
+            zoom = clamp(parseFloat(z.toFixed(2)), 0.4, 3);
+            renderPage(currentPage);
+        }
+
+        // ============ ANOTASI: RENDER KE LAYER ============
+        function pageAnnos() { return annotations.filter(a => a.page === currentPage); }
+
+        function renderAnnotations() {
+            annoLayer.innerHTML = '';
+            annoLayer.classList.toggle('placing', currentTool !== 'select');
+            pageAnnos().forEach(a => annoLayer.appendChild(buildAnnoEl(a)));
+            // Pertahankan seleksi visual
+            if (selectedId) {
+                const el = annoLayer.querySelector(`[data-id="${selectedId}"]`);
+                if (el) el.classList.add('selected');
+            }
+        }
+
+        function buildAnnoEl(a) {
+            const el = document.createElement('div');
+            el.className = 'anno anno-' + a.type;
+            el.dataset.id = a.id;
+
+            if (a.type === 'text') {
+                el.style.left = (a.x * scale) + 'px';
+                el.style.top = (a.y * scale) + 'px';
+                el.style.color = a.color;
+                el.style.fontSize = (a.fontSize * scale) + 'px';
+                el.style.lineHeight = '1.25';
+                el.textContent = a.text;
+            } else if (a.type === 'rect') {
+                el.classList.add('resizable');
+                el.style.left = (a.x * scale) + 'px';
+                el.style.top = (a.y * scale) + 'px';
+                el.style.width = (a.w * scale) + 'px';
+                el.style.height = (a.h * scale) + 'px';
+                const shape = a.shape || 'rect';
+                const style = a.style || 'fill';
+                el.style.borderRadius = (shape === 'ellipse') ? '50%' : '2px';
+                if (style === 'outline') {
+                    el.style.background = 'transparent';
+                    el.style.border = `${Math.max(1, (a.border || 3) * scale)}px solid ${hexToRgba(a.color, a.opacity < 0.5 ? 1 : a.opacity)}`;
+                } else {
+                    el.style.border = 'none';
+                    el.style.background = hexToRgba(a.color, a.opacity);
+                }
+            } else if (a.type === 'image') {
+                el.classList.add('resizable');
+                el.style.left = (a.x * scale) + 'px';
+                el.style.top = (a.y * scale) + 'px';
+                el.style.width = (a.w * scale) + 'px';
+                el.style.height = (a.h * scale) + 'px';
+                const img = document.createElement('img');
+                img.src = a.dataUrl;
+                el.appendChild(img);
+            } else if (a.type === 'line' || a.type === 'draw') {
+                const bb = pointsBBox(a.points, a.thickness);
+                el.style.left = (bb.x * scale) + 'px';
+                el.style.top = (bb.y * scale) + 'px';
+                el.style.width = (bb.w * scale) + 'px';
+                el.style.height = (bb.h * scale) + 'px';
+                el.appendChild(buildPolylineSvg(a, bb));
+            }
+
+            // Tombol hapus
+            const del = document.createElement('button');
+            del.className = 'anno-del';
+            del.innerHTML = '<i class="fas fa-times"></i>';
+            del.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); deleteAnno(a.id); });
+            el.appendChild(del);
+
+            // Handle resize (hanya rect & image)
+            if (a.type === 'rect' || a.type === 'image') {
+                const rz = document.createElement('div');
+                rz.className = 'anno-resize';
+                rz.addEventListener('pointerdown', (e) => startResize(e, a, el));
+                el.appendChild(rz);
+            }
+
+            // Interaksi
+            el.addEventListener('pointerdown', (e) => onAnnoPointerDown(e, a, el));
+            if (a.type === 'text') {
+                el.addEventListener('dblclick', () => beginEditText(a, el));
+            }
+            return el;
+        }
+
+        // Kotak pembatas dari kumpulan titik (+ padding untuk ketebalan garis).
+        function pointsBBox(points, thick) {
+            const pad = (thick || 1) / 2 + 1;
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            points.forEach(p => { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); });
+            return { x: minX - pad, y: minY - pad, w: (maxX - minX) + pad * 2, h: (maxY - minY) + pad * 2, pad };
+        }
+
+        // SVG polyline relatif terhadap kotak pembatas (dalam piksel layar).
+        function buildPolylineSvg(a, bb) {
+            const ns = 'http://www.w3.org/2000/svg';
+            const svg = document.createElementNS(ns, 'svg');
+            const poly = document.createElementNS(ns, 'polyline');
+            const pts = a.points.map(p => `${((p.x - bb.x) * scale).toFixed(2)},${((p.y - bb.y) * scale).toFixed(2)}`).join(' ');
+            poly.setAttribute('points', pts);
+            poly.setAttribute('fill', 'none');
+            poly.setAttribute('stroke', a.color);
+            poly.setAttribute('stroke-width', (a.thickness * scale).toFixed(2));
+            poly.setAttribute('stroke-linecap', 'round');
+            poly.setAttribute('stroke-linejoin', 'round');
+            svg.appendChild(poly);
+            return svg;
+        }
+
+        // ============ ANOTASI: SELEKSI ============
+        function selectAnno(id) {
+            selectedId = id;
+            annoLayer.querySelectorAll('.anno').forEach(el => el.classList.toggle('selected', el.dataset.id == id));
+            syncPropsToSelection();
+        }
+        function deselect() { selectedId = null; annoLayer.querySelectorAll('.anno.selected').forEach(el => el.classList.remove('selected')); syncPropsToSelection(); }
+        function getSelected() { return annotations.find(a => a.id == selectedId) || null; }
+
+        function deleteAnno(id) {
+            annotations = annotations.filter(a => a.id != id);
+            if (selectedId == id) selectedId = null;
+            renderAnnotations();
+            syncPropsToSelection();
+            commitHistory();
+            showFeedback('Elemen dihapus.');
+        }
+
+        // ============ UNDO / REDO ============
+        function snapshot() { return JSON.parse(JSON.stringify(annotations)); }
+
+        function initHistory() { history = [snapshot()]; histIndex = 0; updateHistoryButtons(); }
+
+        // Catat keadaan saat ini sebagai langkah baru di history.
+        function commitHistory() {
+            history = history.slice(0, histIndex + 1);
+            history.push(snapshot());
+            if (history.length > HIST_LIMIT) history.shift();
+            histIndex = history.length - 1;
+            updateHistoryButtons();
+        }
+
+        function applyState(state) {
+            annotations = JSON.parse(JSON.stringify(state));
+            // Pastikan annoSeq tetap di atas id terbesar agar id baru tak bentrok.
+            annotations.forEach(a => { if (a.id > annoSeq) annoSeq = a.id; });
+            if (!annotations.some(a => a.id == selectedId)) selectedId = null;
+            renderAnnotations();
+            syncPropsToSelection();
+        }
+
+        function undo() {
+            if (histIndex <= 0) return;
+            histIndex--;
+            applyState(history[histIndex]);
+            updateHistoryButtons();
+            showFeedback('Diurungkan.');
+        }
+        function redo() {
+            if (histIndex >= history.length - 1) return;
+            histIndex++;
+            applyState(history[histIndex]);
+            updateHistoryButtons();
+            showFeedback('Diulangi.');
+        }
+        function updateHistoryButtons() {
+            undoBtn.disabled = (histIndex <= 0);
+            redoBtn.disabled = (histIndex >= history.length - 1);
+        }
+
+        // ============ HAPUS MASSAL ============
+        function clearPageEdits() {
+            const onPage = annotations.filter(a => a.page === currentPage);
+            if (onPage.length === 0) { showToast('Tidak ada editan di halaman ini.'); return; }
+            annotations = annotations.filter(a => a.page !== currentPage);
+            selectedId = null;
+            renderAnnotations();
+            syncPropsToSelection();
+            commitHistory();
+            showFeedback(`Menghapus ${onPage.length} editan di halaman ${currentPage + 1}.`);
+        }
+        function clearAllEdits() {
+            if (annotations.length === 0) { showToast('Belum ada editan.'); return; }
+            const n = annotations.length;
+            annotations = [];
+            selectedId = null;
+            renderAnnotations();
+            syncPropsToSelection();
+            commitHistory();
+            showFeedback(`Menghapus semua editan (${n} elemen).`);
+        }
+
+        // ============ TOOLS ============
+        function setTool(tool) {
+            if (tool === 'image') {
+                // Tool gambar langsung membuka pemilih berkas; mode aktif tetap "pilih".
+                if (!pdfDocProxy) return;
+                imgInput.click();
+                return;
+            }
+            currentTool = tool;
+            toolButtons.forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
+            annoLayer.classList.toggle('placing', tool !== 'select');
+            syncPropsToSelection();
+        }
+
+        // Tampilkan kontrol properti yang relevan (berdasarkan seleksi atau tool aktif)
+        function syncPropsToSelection() {
+            const sel = getSelected();
+            const ctx = sel ? sel.type : currentTool;
+            const isLine = (ctx === 'line' || ctx === 'draw');
+            const isRect = (ctx === 'rect');
+            // Gaya blok warna efektif (dari seleksi atau pilihan tool saat ini)
+            const style = isRect ? (sel ? (sel.style || 'fill') : rectStyle) : null;
+            const isFillRect = isRect && style === 'fill';
+            const isOutlineRect = isRect && style === 'outline';
+            const showColor = (ctx === 'text' || isRect || isLine);
+
+            propColor.classList.toggle('is-hidden', !showColor);
+            propFont.classList.toggle('is-hidden', ctx !== 'text');
+            // Ketebalan: untuk garis/coret ATAU kotak/lingkaran garis (border)
+            propThick.classList.toggle('is-hidden', !(isLine || isOutlineRect));
+            // Opasitas & stabilo hanya relevan untuk blok ISI
+            propOpacity.classList.toggle('is-hidden', !isFillRect);
+            propSwatch.classList.toggle('is-hidden', !isFillRect);
+
+            // Selaraskan ikon tombol Warna & item aktif di menu dropdown
+            syncShapeUI();
+
+            if (sel) {
+                if (sel.color) colorPicker.value = sel.color;
+                if (sel.type === 'text') fontSizeInput.value = sel.fontSize;
+                if (sel.type === 'line' || sel.type === 'draw') thicknessInput.value = sel.thickness;
+                if (sel.type === 'rect') {
+                    opacityInput.value = Math.round((sel.opacity || 0.4) * 100); opacityVal.textContent = opacityInput.value + '%';
+                    if (sel.style === 'outline') thicknessInput.value = sel.border || 3;
+                }
+            }
+        }
+
+        // Klik di layer kosong => tempatkan elemen sesuai tool
+        function onLayerPointerDown(e) {
+            if (e.target !== annoLayer) return;       // klik harus di area kosong
+            if (currentTool === 'select') { deselect(); return; }
+            if (currentTool === 'line' || currentTool === 'draw') { startDrawing(e); return; }
+            const { x, y } = layerPointToPt(e);
+            if (currentTool === 'text') createText(x, y);
+            else if (currentTool === 'rect') createRect(x, y);
+            // gambar ditangani lewat imgInput
+        }
+
+        // ============ MENGGAMBAR GARIS / CORET ============
+        function startDrawing(e) {
+            deselect();
+            const start = layerPointToPt(e);
+            drawing = { type: currentTool, color: colorPicker.value, thickness: thickness, points: [start] };
+            if (currentTool === 'line') drawing.points.push({ x: start.x, y: start.y });
+
+            const ns = 'http://www.w3.org/2000/svg';
+            const svg = document.createElementNS(ns, 'svg');
+            svg.id = 'drawPreview';
+            const poly = document.createElementNS(ns, 'polyline');
+            poly.setAttribute('fill', 'none');
+            poly.setAttribute('stroke', drawing.color);
+            poly.setAttribute('stroke-linecap', 'round');
+            poly.setAttribute('stroke-linejoin', 'round');
+            svg.appendChild(poly);
+            annoLayer.appendChild(svg);
+            drawing.previewPoly = poly;
+            drawing.previewSvg = svg;
+            updateDrawPreview();
+
+            annoLayer.setPointerCapture(e.pointerId);
+            const move = (ev) => {
+                const pt = layerPointToPt(ev);
+                if (drawing.type === 'line') {
+                    drawing.points[1] = pt;
+                } else {
+                    const last = drawing.points[drawing.points.length - 1];
+                    if (Math.hypot(pt.x - last.x, pt.y - last.y) * scale > 2) drawing.points.push(pt);
+                }
+                updateDrawPreview();
+            };
+            const up = () => {
+                annoLayer.releasePointerCapture(e.pointerId);
+                annoLayer.removeEventListener('pointermove', move);
+                annoLayer.removeEventListener('pointerup', up);
+                finishDrawing();
+            };
+            annoLayer.addEventListener('pointermove', move);
+            annoLayer.addEventListener('pointerup', up);
+        }
+
+        function updateDrawPreview() {
+            if (!drawing) return;
+            const pts = drawing.points.map(p => `${(p.x * scale).toFixed(2)},${(p.y * scale).toFixed(2)}`).join(' ');
+            drawing.previewPoly.setAttribute('points', pts);
+            drawing.previewPoly.setAttribute('stroke-width', (drawing.thickness * scale).toFixed(2));
+        }
+
+        function finishDrawing() {
+            if (!drawing) return;
+            const d = drawing; drawing = null;
+            if (d.previewSvg) d.previewSvg.remove();
+
+            let valid;
+            if (d.type === 'line') {
+                const p0 = d.points[0], p1 = d.points[1];
+                valid = Math.hypot(p1.x - p0.x, p1.y - p0.y) * scale > 4;
+            } else {
+                valid = d.points.length > 2;
+            }
+            if (!valid) { setTool('select'); return; }
+
+            const a = { id: ++annoSeq, page: currentPage, type: d.type, points: d.points, color: d.color, thickness: d.thickness };
+            annotations.push(a);
+            renderAnnotations();
+            setTool('select');
+            selectAnno(a.id);
+            commitHistory();
+            showFeedback(d.type === 'line' ? 'Garis ditambahkan.' : 'Coretan ditambahkan.');
+        }
+
+        function layerPointToPt(e) {
+            const r = annoLayer.getBoundingClientRect();
+            return { x: (e.clientX - r.left) / scale, y: (e.clientY - r.top) / scale };
+        }
+
+        function createText(xPt, yPt) {
+            const a = { id: ++annoSeq, page: currentPage, type: 'text', x: xPt, y: yPt,
+                        text: 'Teks', color: colorPicker.value, fontSize: clamp(parseInt(fontSizeInput.value) || 24, 6, 200) };
+            annotations.push(a);
+            renderAnnotations();
+            setTool('select');
+            selectAnno(a.id);
+            const el = annoLayer.querySelector(`[data-id="${a.id}"]`);
+            if (el) beginEditText(a, el, true);
+        }
+
+        function createRect(xPt, yPt) {
+            // Bentuk garis/elips default sedikit lebih besar agar enak dilihat.
+            const defH = rectStyle === 'outline' || rectShape === 'ellipse' ? 90 : 48;
+            const wPt = Math.min(160 / scale, pageSizes[currentPage].wPt - xPt);
+            const hPt = Math.min(defH / scale, pageSizes[currentPage].hPt - yPt);
+            const a = { id: ++annoSeq, page: currentPage, type: 'rect', x: xPt, y: yPt,
+                        w: Math.max(20, wPt), h: Math.max(12, hPt),
+                        color: colorPicker.value, opacity: (parseInt(opacityInput.value) || 40) / 100,
+                        shape: rectShape, style: rectStyle, border: thickness };
+            annotations.push(a);
+            renderAnnotations();
+            setTool('select');
+            selectAnno(a.id);
+            commitHistory();
+            const labels = { 'rect-fill': 'Blok warna', 'rect-outline': 'Kotak garis', 'ellipse-fill': 'Elips', 'ellipse-outline': 'Lingkaran garis' };
+            showFeedback((labels[rectShape + '-' + rectStyle] || 'Bentuk') + ' ditambahkan. Geser & ubah ukurannya.');
+        }
+
+        async function placeImage(file) {
+            showLoading('Menyiapkan gambar...');
+            try {
+                const dataUrl = await fileToPngDataUrl(file);
+                const img = await loadImage(dataUrl);
+                // Skala awal: lebar maksimal ~40% lebar halaman
+                const pageW = pageSizes[currentPage].wPt;
+                const maxW = pageW * 0.4;
+                let wPt = Math.min(maxW, img.naturalWidth);   // 1px ~ 1pt awal
+                let hPt = wPt * (img.naturalHeight / img.naturalWidth);
+                const a = { id: ++annoSeq, page: currentPage, type: 'image',
+                            x: (pageW - wPt) / 2, y: 40, w: wPt, h: hPt,
+                            dataUrl, natW: img.naturalWidth, natH: img.naturalHeight };
+                annotations.push(a);
+                renderAnnotations();
+                setTool('select');
+                selectAnno(a.id);
+                commitHistory();
+                hideLoading();
+                showFeedback('Gambar disisipkan. Geser & ubah ukurannya.');
+            } catch (err) {
+                console.error('Image error:', err);
+                hideLoading();
+                showError('Gagal memuat gambar.');
+                showToast('Gagal memuat gambar.');
+                setTool('select');
+            }
+        }
+
+        // ============ EDIT TEKS ============
+        function beginEditText(a, el, isNew = false) {
+            el.setAttribute('contenteditable', 'true');
+            el.focus();
+            // Letakkan caret
+            const range = document.createRange();
+            range.selectNodeContents(el);
+            if (!isNew) range.collapse(false);
+            const selObj = window.getSelection();
+            selObj.removeAllRanges();
+            selObj.addRange(range);
+
+            const finish = () => {
+                el.removeAttribute('contenteditable');
+                el.removeEventListener('blur', finish);
+                el.removeEventListener('keydown', onKey);
+                const txt = el.innerText.replace(/\n$/, '');
+                const prev = a.text;
+                a.text = txt;
+                if (txt.trim() === '') {
+                    // Teks kosong: buang elemen tanpa mengubah history bila baru dibuat.
+                    annotations = annotations.filter(x => x.id != a.id);
+                    if (selectedId == a.id) selectedId = null;
+                    renderAnnotations();
+                    if (isNew) updateHistoryButtons(); else commitHistory();
+                    return;
+                }
+                renderAnnotations();
+                selectAnno(a.id);
+                if (isNew || txt !== prev) commitHistory();
+            };
+            const onKey = (ev) => {
+                ev.stopPropagation();
+                if (ev.key === 'Escape') { ev.preventDefault(); el.blur(); }
+                // Enter membuat baris baru (shift tidak wajib) — biarkan default kecuali Ctrl+Enter selesai
+                if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); el.blur(); }
+            };
+            el.addEventListener('blur', finish);
+            el.addEventListener('keydown', onKey);
+        }
+
+        // ============ DRAG (PINDAH) ============
+        function onAnnoPointerDown(e, a, el) {
+            if (el.getAttribute('contenteditable') === 'true') return; // sedang mengetik
+            if (e.target.closest('.anno-del') || e.target.closest('.anno-resize')) return;
+            if (currentTool !== 'select') return;
+            e.preventDefault();
+            selectAnno(a.id);
+
+            const startX = e.clientX, startY = e.clientY;
+            const isPath = (a.type === 'line' || a.type === 'draw');
+            const origX = a.x, origY = a.y;
+            const origPoints = isPath ? a.points.map(p => ({ x: p.x, y: p.y })) : null;
+            let moved = false;
+            el.setPointerCapture(e.pointerId);
+
+            const move = (ev) => {
+                const dxPt = (ev.clientX - startX) / scale;
+                const dyPt = (ev.clientY - startY) / scale;
+                if (Math.abs(ev.clientX - startX) > 2 || Math.abs(ev.clientY - startY) > 2) moved = true;
+                if (isPath) {
+                    a.points = origPoints.map(p => ({ x: p.x + dxPt, y: p.y + dyPt }));
+                    const bb = pointsBBox(a.points, a.thickness);
+                    el.style.left = (bb.x * scale) + 'px';
+                    el.style.top = (bb.y * scale) + 'px';
+                } else {
+                    a.x = clamp(origX + dxPt, 0, pageSizes[currentPage].wPt - 2);
+                    a.y = clamp(origY + dyPt, 0, pageSizes[currentPage].hPt - 2);
+                    el.style.left = (a.x * scale) + 'px';
+                    el.style.top = (a.y * scale) + 'px';
+                }
+            };
+            const up = (ev) => {
+                el.releasePointerCapture(e.pointerId);
+                el.removeEventListener('pointermove', move);
+                el.removeEventListener('pointerup', up);
+                if (moved) { commitHistory(); showFeedback('Elemen dipindahkan.'); }
+            };
+            el.addEventListener('pointermove', move);
+            el.addEventListener('pointerup', up);
+        }
+
+        // ============ RESIZE (rect & image) ============
+        function startResize(e, a, el) {
+            e.stopPropagation(); e.preventDefault();
+            selectAnno(a.id);
+            const startX = e.clientX, startY = e.clientY;
+            const origW = a.w, origH = a.h;
+            const ratio = (a.type === 'image') ? (a.h / a.w) : null;
+            const handle = e.target;
+            handle.setPointerCapture(e.pointerId);
+
+            const move = (ev) => {
+                let dW = (ev.clientX - startX) / scale;
+                let newW = clamp(origW + dW, 10, pageSizes[currentPage].wPt - a.x);
+                let newH;
+                if (ratio) { newH = newW * ratio; }
+                else { newH = clamp(origH + (ev.clientY - startY) / scale, 8, pageSizes[currentPage].hPt - a.y); }
+                a.w = newW; a.h = newH;
+                el.style.width = (newW * scale) + 'px';
+                el.style.height = (newH * scale) + 'px';
+            };
+            const up = () => {
+                handle.releasePointerCapture(e.pointerId);
+                handle.removeEventListener('pointermove', move);
+                handle.removeEventListener('pointerup', up);
+                commitHistory();
+                showFeedback('Ukuran elemen diubah.');
+            };
+            handle.addEventListener('pointermove', move);
+            handle.addEventListener('pointerup', up);
+        }
+
+        // ============ SIMPAN & UNDUH ============
+        async function savePdf() {
+            if (!originalBytes) return;
+            if (annotations.length === 0) {
+                showToast('Belum ada editan. Menyimpan salinan PDF apa adanya.');
+            }
+            downloadBtn.disabled = true; resetBtn.disabled = true;
+            showLoading('Menyimpan editan ke dalam PDF...');
+            try {
+                const doc = await PDFDocument.load(originalBytes, { ignoreEncryption: true });
+                const font = await doc.embedFont(StandardFonts.Helvetica);
+                const pages = doc.getPages();
+
+                // Cache embed gambar agar gambar sama tidak di-embed berulang
+                const imageCache = {};
+
+                for (let p = 0; p < pages.length; p++) {
+                    const annos = annotations.filter(a => a.page === p);
+                    if (annos.length === 0) continue;
+                    const page = pages[p];
+                    const { width: pw, height: ph } = page.getSize();
+                    setLoadingText(`Menulis halaman ${p + 1} dari ${pages.length}...`);
+
+                    for (const a of annos) {
+                        if (a.type === 'rect') {
+                            const col = hexToRgb01(a.color);
+                            const color = rgb(col.r, col.g, col.b);
+                            const shape = a.shape || 'rect';
+                            const style = a.style || 'fill';
+                            const bOpacity = (a.opacity < 0.5 ? 1 : a.opacity);
+                            if (shape === 'ellipse') {
+                                const cfg = {
+                                    x: a.x + a.w / 2, y: ph - (a.y + a.h / 2),
+                                    xScale: a.w / 2, yScale: a.h / 2
+                                };
+                                if (style === 'outline') { cfg.borderColor = color; cfg.borderWidth = a.border || 3; cfg.borderOpacity = bOpacity; }
+                                else { cfg.color = color; cfg.opacity = a.opacity; }
+                                page.drawEllipse(cfg);
+                            } else {
+                                const cfg = { x: a.x, y: ph - a.y - a.h, width: a.w, height: a.h };
+                                if (style === 'outline') { cfg.borderColor = color; cfg.borderWidth = a.border || 3; cfg.borderOpacity = bOpacity; }
+                                else { cfg.color = color; cfg.opacity = a.opacity; }
+                                page.drawRectangle(cfg);
+                            }
+                        } else if (a.type === 'image') {
+                            let embedded = imageCache[a.dataUrl];
+                            if (!embedded) {
+                                const bytes = dataUrlToBytes(a.dataUrl);
+                                embedded = await doc.embedPng(bytes);
+                                imageCache[a.dataUrl] = embedded;
+                            }
+                            page.drawImage(embedded, { x: a.x, y: ph - a.y - a.h, width: a.w, height: a.h });
+                        } else if (a.type === 'line' || a.type === 'draw') {
+                            const col = hexToRgb01(a.color);
+                            const lineCap = (PDFLib.LineCapStyle && PDFLib.LineCapStyle.Round) || undefined;
+                            const pts = a.points.map(p => ({ x: p.x, y: ph - p.y }));
+                            for (let i = 0; i < pts.length - 1; i++) {
+                                page.drawLine({
+                                    start: pts[i], end: pts[i + 1],
+                                    thickness: a.thickness, color: rgb(col.r, col.g, col.b),
+                                    lineCap
+                                });
+                            }
+                        } else if (a.type === 'text') {
+                            const col = hexToRgb01(a.color);
+                            const lines = String(a.text).split('\n');
+                            const fs = a.fontSize;
+                            const lineStep = fs * 1.25;
+                            lines.forEach((line, i) => {
+                                // baseline baris pertama ≈ atas + 0.84*fontSize (perkiraan ascent + half-leading)
+                                const baselineFromTop = a.y + fs * 0.84 + i * lineStep;
+                                page.drawText(sanitizeText(line), {
+                                    x: a.x, y: ph - baselineFromTop, size: fs, font,
+                                    color: rgb(col.r, col.g, col.b)
+                                });
+                            });
+                        }
+                    }
+                }
+
+                const out = await doc.save();
+                triggerDownload(out, 'editor.pdf');
+                showFeedback('PDF berhasil disimpan & diunduh sebagai editor.pdf.', true);
+                showToast('PDF berhasil diunduh!');
+            } catch (err) {
+                console.error('Save error:', err);
+                showError('Gagal menyimpan PDF: ' + (err.message || 'Kesalahan tak terduga.'));
+                showToast('Gagal menyimpan PDF.');
+            } finally {
+                hideLoading();
+                downloadBtn.disabled = false; resetBtn.disabled = false;
+            }
+        }
+
+        // ============ UTIL ============
+        function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+        function hexToRgb01(hex) {
+            const n = parseInt(hex.replace('#', ''), 16);
+            return { r: ((n >> 16) & 255) / 255, g: ((n >> 8) & 255) / 255, b: (n & 255) / 255 };
+        }
+        function hexToRgba(hex, alpha) {
+            const n = parseInt(hex.replace('#', ''), 16);
+            return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+        }
+
+        // Helvetica (WinAnsi) tidak mendukung semua karakter; ganti yang tak didukung agar tidak error.
+        function sanitizeText(s) {
+            return s
+                .replace(/[‘’‚]/g, "'")
+                .replace(/[“”„]/g, '"')
+                .replace(/[–—]/g, '-')
+                .replace(/…/g, '...')
+                .replace(/[^\x00-\xFF]/g, '?'); // di luar Latin-1 -> '?'
+        }
+
+        function dataUrlToBytes(dataUrl) {
+            const base64 = dataUrl.split(',')[1];
+            const bin = atob(base64);
+            const bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            return bytes;
+        }
+
+        function loadImage(src) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = src;
+            });
+        }
+
+        // Konversi gambar apa pun (jpg/png/webp/gif) -> PNG dataURL agar pasti bisa di-embed pdf-lib.
+        async function fileToPngDataUrl(file) {
+            const url = URL.createObjectURL(file);
+            try {
+                const img = await loadImage(url);
+                const canvas = document.createElement('canvas');
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
+                canvas.getContext('2d').drawImage(img, 0, 0);
+                return canvas.toDataURL('image/png');
+            } finally {
+                URL.revokeObjectURL(url);
+            }
+        }
+
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        // ============ UI HELPERS ============
+        function showLoading(message) { setLoadingText(message); loadingBox.style.display = 'flex'; errorEl.textContent = ''; }
+        function setLoadingText(message) { loadingText.textContent = message; }
+        function hideLoading() { loadingBox.style.display = 'none'; }
+        function showError(message) { errorEl.textContent = message; }
+        function showFeedback(message, isSuccess = true) {
+            statusEl.textContent = message;
+            statusEl.style.color = isSuccess ? '#047857' : '#dc3545';
+            clearTimeout(statusEl.dataset.timer);
+            statusEl.dataset.timer = setTimeout(() => { statusEl.textContent = ''; statusEl.style.color = '#047857'; }, 3000);
+        }
+        function showToast(text) {
+            toastEl.innerText = text;
+            toastEl.style.visibility = 'visible';
+            toastEl.style.opacity = '1';
+            clearTimeout(toastEl.dataset.timer);
+            toastEl.dataset.timer = setTimeout(() => {
+                toastEl.style.opacity = '0';
+                setTimeout(() => { toastEl.style.visibility = 'hidden'; }, 300);
+            }, 3000);
+        }
+
+        function triggerDownload(data, filename) {
+            const blob = new Blob([data], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = filename;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function resetTool() {
+            originalBytes = null; pdfDocProxy = null; numPages = 0; currentPage = 0;
+            pageSizes = []; annotations = []; annoSeq = 0; selectedId = null; zoom = 1;
+            history = []; histIndex = -1; drawing = null;
+            annoLayer.innerHTML = '';
+            fileInfo.classList.add('hidden'); fileInfo.innerHTML = '';
+            editor.classList.add('hidden');
+            downloadBtn.classList.add('hidden');
+            resetBtn.classList.add('hidden');
+            pdfDropArea.classList.remove('hidden');
+            hideLoading(); showError(''); statusEl.textContent = '';
+            fileInput.value = ''; imgInput.value = '';
+            setTool('select');
+        }
+
+        // Inisialisasi
+        resetTool();
+    })();
+    </script>
+</div>

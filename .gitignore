@@ -1,0 +1,15 @@
+# Berkas sementara / sistem
+.__check.js
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*~
+
+# Dependensi (tidak dipakai — semua via CDN)
+node_modules/
