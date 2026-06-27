@@ -4,6 +4,8 @@ Tool **editor PDF berbasis web** dalam **satu file HTML** — tanpa server, tanp
 
 > Bagian dari kumpulan tool PDF bertema **emerald** (selaras dengan _Organize PDF_).
 
+**🔗 Demo langsung:** https://zuseto.github.io/editor-pdf/
+
 ## ✨ Fitur
 
 - **Tambah Teks** — klik di halaman untuk menaruh teks, klik dua kali untuk menyunting. Atur warna & ukuran font.
@@ -55,4 +57,4 @@ Seluruh pemrosesan terjadi di perangkat pengguna (di dalam browser). **Tidak ada
 
 ## 📄 Lisensi
 
-[MIT](LICENSE) © Zulham Sentoso
+[MIT](LICENSE) © zuseto
